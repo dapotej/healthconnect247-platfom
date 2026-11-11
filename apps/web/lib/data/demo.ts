@@ -24,6 +24,7 @@ import type {
   BillingConsultation,
   Client,
   ClientConsultation,
+  ConsultationImportRecord,
   DataSource,
   Invoice,
   LedgerRow,
@@ -140,27 +141,27 @@ function contract(partial: Partial<Contract> & Pick<Contract, 'id' | 'clientId' 
 
 const SPECS: ClientSpec[] = [
   {
-    client: { id: 'lagos-state', name: 'Lagos State Government', type: 'government', isPilot: false },
+    client: { id: 'lagos-state', name: 'Lagos State Government', type: 'government', isPilot: false, emrNames: ['LASHMA'] },
     prefix: 'LS', active: 52_000, suspended: 0, appShare: 0.31, novCount: 3_210,
     contract: contract({ id: 'c-lagos', clientId: 'lagos-state', pricingModel: 'unlimited', startsOn: '2026-01-01', endsOn: '2026-12-31', pmpmKobo: 35_000 }),
   },
   {
-    client: { id: 'hmo-a', name: '[HMO A]', type: 'hmo', isPilot: false },
+    client: { id: 'hmo-a', name: '[HMO A]', type: 'hmo', isPilot: false, emrNames: ['HMO A'] },
     prefix: 'HA', active: 14_800, suspended: 120, appShare: 6_210 / 14_800, novCount: 1_420,
     contract: contract({ id: 'c-hmo-a', clientId: 'hmo-a', pricingModel: 'flex', startsOn: '2026-07-01', endsOn: '2027-06-30', rates: FLEX_RATES }),
   },
   {
-    client: { id: 'hmo-b', name: '[HMO B]', type: 'hmo', isPilot: false },
+    client: { id: 'hmo-b', name: '[HMO B]', type: 'hmo', isPilot: false, emrNames: ['HMO B'] },
     prefix: 'HB', active: 9_600, suspended: 45, appShare: 0.38, novCount: 980,
     contract: contract({ id: 'c-hmo-b', clientId: 'hmo-b', pricingModel: 'payg', startsOn: '2026-04-01', endsOn: '2027-03-31', platformFeeKobo: 25_000_000, rates: PAYG_RATES }),
   },
   {
-    client: { id: 'hmo-c', name: '[HMO C]', type: 'hmo', isPilot: false },
+    client: { id: 'hmo-c', name: '[HMO C]', type: 'hmo', isPilot: false, emrNames: ['HMO C'] },
     prefix: 'HC', active: 5_350, suspended: 12, appShare: 0.35, novCount: 512,
     contract: contract({ id: 'c-hmo-c', clientId: 'hmo-c', pricingModel: 'flex', startsOn: '2026-10-01', endsOn: '2027-09-30', rates: FLEX_RATES }),
   },
   {
-    client: { id: 'hmo-d', name: '[HMO D]', type: 'hmo', isPilot: true },
+    client: { id: 'hmo-d', name: '[HMO D]', type: 'hmo', isPilot: true, emrNames: ['HMO D'] },
     prefix: 'HD', active: 2_500, suspended: 0, appShare: 0.4, novCount: 290,
     contract: contract({ id: 'c-hmo-d', clientId: 'hmo-d', pricingModel: 'payg', startsOn: '2026-10-01', endsOn: '2027-01-31', platformFeeKobo: 25_000_000, rates: PAYG_RATES }),
   },
@@ -183,6 +184,8 @@ interface DemoStore {
   invoices: Invoice[];
   imports: Map<string, MemberImportSummary>;
   staff: StaffMember[];
+  consultationImports: ConsultationImportRecord[];
+  patientCodes: Map<string, string>;
 }
 
 function randomTime(rng: Rng, day: string): string {
@@ -409,7 +412,7 @@ function build(): DemoStore {
     }],
   ]);
 
-  return { members, membersByClient, consultations, ledgers, invoices, imports, staff };
+  return { members, membersByClient, consultations, ledgers, invoices, imports, staff, consultationImports: [], patientCodes: new Map() };
 }
 
 // Keep one store across hot reloads in development.
@@ -450,7 +453,8 @@ export const demoDataSource: DataSource = {
   },
   async searchMembers(clientId, { filter, query, offset, limit }) {
     const q = query?.trim().toLowerCase().replace(/\s+/g, ' ');
-    const digits = q?.replace(/\D/g, '');
+    // Phone digits as people type them: 0803… or 234803… both match +234803…
+    const digits = q?.replace(/\D/g, '').replace(/^(234|0)/, '');
     const rows = (store().membersByClient.get(clientId) ?? []).filter((m) => {
       if (filter === 'active' && m.status !== 'active') return false;
       if (filter === 'suspended' && m.status !== 'suspended') return false;
@@ -609,6 +613,85 @@ export const demoDataSource: DataSource = {
     inv.status = inv.paidKobo === inv.totalKobo ? 'paid' : 'part_paid';
     if (inv.status === 'paid') inv.paidOn = payment.paidOn;
     return inv;
+  },
+
+  async setClientEmrNames(clientId, names) {
+    const wanted = [...new Set(names.map((n) => n.trim()).filter(Boolean))];
+    const taken = SPECS.some((s) => s.client.id !== clientId && s.client.emrNames.some((n) => wanted.some((w) => w.toLowerCase() === n.toLowerCase())));
+    if (taken) throw new DataRuleError('emr_name_taken', 'That EMR name belongs to another client');
+    const spec = SPECS.find((s) => s.client.id === clientId);
+    if (!spec) throw new DataRuleError('not_allowed', 'Client not found');
+    spec.client.emrNames = wanted;
+  },
+  async memberIndex(clientId) {
+    const codes = store().patientCodes;
+    return (store().membersByClient.get(clientId) ?? []).map((m) => ({
+      id: m.id,
+      externalMemberId: m.externalMemberId,
+      phoneE164: m.phoneE164,
+      patientCode: codes.get(m.id) ?? null,
+    }));
+  },
+  async existingConsultationRefs(refs) {
+    const all = new Set(store().consultations.map((c) => c.externalRef));
+    return new Set(refs.filter((r) => all.has(r)));
+  },
+  async recordConsultationImport(input) {
+    const s = store();
+    const known = new Set(s.consultations.map((c) => c.externalRef));
+    let imported = 0;
+    let skippedDuplicates = input.alreadyImported;
+    for (const c of input.consultations) {
+      if (known.has(c.externalRef)) {
+        skippedDuplicates++;
+        continue;
+      }
+      const member = s.members.find((m) => m.id === c.memberId);
+      if (!member) continue;
+      s.consultations.push({
+        id: `imp-${c.externalRef}`,
+        externalRef: c.externalRef,
+        clientId: c.clientId,
+        occurredAt: c.occurredAt,
+        type: c.type,
+        channel: c.channel,
+        language: c.language,
+        memberId: member.id,
+        externalMemberId: member.externalMemberId,
+        memberName: member.fullName,
+        clinicianName: c.clinicianName,
+        clinicianLicence: c.clinicianLicence,
+        diagnosisCode: c.diagnosisCode,
+        diagnosisLabel: c.diagnosisLabel,
+        outcome: c.outcome,
+        chargeKobo: c.chargeKobo,
+        billing: c.billing,
+      });
+      if (c.billing === 'credit' && c.chargeKobo > 0) {
+        const ledger = s.ledgers.get(c.clientId) ?? [];
+        ledger.push({ occurredAt: c.occurredAt, kind: 'usage', amountKobo: -c.chargeKobo, consultationCount: 1 });
+        s.ledgers.set(c.clientId, ledger);
+      }
+      known.add(c.externalRef);
+      imported++;
+    }
+    for (const { memberId, patientCode } of input.memberCodes) {
+      if (!s.patientCodes.has(memberId)) s.patientCodes.set(memberId, patientCode);
+    }
+    const id = `imp-${s.consultationImports.length + 1}`;
+    s.consultationImports.unshift({
+      id,
+      filename: input.filename,
+      importedAt: new Date().toISOString(),
+      rowsTotal: input.rowsTotal,
+      imported,
+      skippedDuplicates,
+      problems: input.problems,
+    });
+    return { id, imported, skippedDuplicates };
+  },
+  async consultationImports(limit) {
+    return store().consultationImports.slice(0, limit);
   },
 
   async listStaff() {

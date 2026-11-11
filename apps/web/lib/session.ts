@@ -1,6 +1,8 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { cache } from 'react';
 import { isDemoMode } from './data';
+import { supabaseServer } from './supabase/server';
 
 export type Role = 'ops_admin' | 'finance' | 'client_admin' | 'client_finance' | 'client_viewer';
 
@@ -12,7 +14,7 @@ export interface SessionUser {
   clientId: string | null;
 }
 
-/** Demo accounts. Real accounts will come from Supabase Auth and public.profiles. */
+/** Demo accounts (demo mode only). Real accounts come from Supabase Auth and public.profiles. */
 export const DEMO_USERS: SessionUser[] = [
   { id: 'demo-hmo-a-admin', name: '[Name]', title: 'Head of claims, [HMO A]', role: 'client_admin', clientId: 'hmo-a' },
   { id: 'demo-hmo-b-admin', name: '[Name]', title: 'Claims manager, [HMO B]', role: 'client_admin', clientId: 'hmo-b' },
@@ -23,11 +25,49 @@ export const DEMO_USERS: SessionUser[] = [
 
 const COOKIE = 'hc247_demo_user';
 
-export async function getSession(): Promise<SessionUser | null> {
-  if (!isDemoMode()) return null;
-  const id = (await cookies()).get(COOKIE)?.value;
-  return DEMO_USERS.find((u) => u.id === id) ?? null;
+const ROLE_TITLES: Record<Role, string> = {
+  ops_admin: 'Operations',
+  finance: 'Finance',
+  client_admin: 'Administrator',
+  client_finance: 'Finance',
+  client_viewer: 'Viewer',
+};
+
+/** A real account from Supabase Auth and public.profiles, as the database sees it. */
+interface WhoAmI {
+  id: string;
+  fullName: string;
+  role: string;
+  clientId: string | null;
+  clientName: string | null;
+  status: 'invited' | 'active' | 'disabled';
 }
+
+/**
+ * The signed-in person, or null. Real accounts need a profile with a role
+ * that uses this site (operations, finance or a client role) and must not be
+ * disabled. Clinical staff will use the clinician console instead.
+ */
+export const getSession = cache(async (): Promise<SessionUser | null> => {
+  if (isDemoMode()) {
+    const id = (await cookies()).get(COOKIE)?.value;
+    return DEMO_USERS.find((u) => u.id === id) ?? null;
+  }
+  const db = await supabaseServer();
+  const { data: auth } = await db.auth.getUser();
+  if (!auth.user) return null;
+  const { data: me } = await db.rpc('app_whoami');
+  const who = me as WhoAmI | null;
+  if (!who || who.status === 'disabled' || !(who.role in ROLE_TITLES)) return null;
+  const role = who.role as Role;
+  return {
+    id: who.id,
+    name: who.fullName,
+    title: who.clientName ? `${ROLE_TITLES[role]}, ${who.clientName}` : ROLE_TITLES[role],
+    role,
+    clientId: who.clientId,
+  };
+});
 
 export async function signInAsDemoUser(id: string): Promise<SessionUser | null> {
   if (!isDemoMode()) return null;
@@ -38,7 +78,11 @@ export async function signInAsDemoUser(id: string): Promise<SessionUser | null> 
 }
 
 export async function signOut(): Promise<void> {
-  (await cookies()).delete(COOKIE);
+  if (isDemoMode()) {
+    (await cookies()).delete(COOKIE);
+    return;
+  }
+  await (await supabaseServer()).auth.signOut();
 }
 
 export function homeFor(user: SessionUser): string {
@@ -74,4 +118,5 @@ export const can = {
   manageInvoices: (u: SessionUser) => u.role === 'finance',
   recordTopUps: (u: SessionUser) => u.role === 'ops_admin' || u.role === 'finance',
   manageStaff: (u: SessionUser) => u.role === 'ops_admin',
+  importConsultations: (u: SessionUser) => u.role === 'ops_admin',
 };

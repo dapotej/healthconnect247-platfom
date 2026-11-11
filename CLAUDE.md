@@ -16,7 +16,8 @@ Build order: backend and call-centre import → client portal + admin minimum �
 - `supabase/migrations` – database schema and row-level security. `supabase/seed.sql` is sample data only.
 - `supabase/tests` – local stand-ins for Supabase auth plus access-rule checks.
 - `apps/web` – Next.js 15 app: `/portal` (HMO users), `/admin` (our staff), `/sign-in`.
-  - Pages read and write only through the `DataSource` interface (`lib/data/types.ts`). `lib/data/demo.ts` is the demo implementation; the Supabase implementation must read consultations through `client_consultations` / `billing_consultations`, never the base table, so the database rules apply.
+  - Pages read and write only through the `DataSource` interface (`lib/data/types.ts`). `lib/data/demo.ts` is the demo implementation; `lib/data/supabase.ts` calls only the `app_*` database functions (`supabase/migrations/*_app_api.sql`), which run as the signed-in user (security invoker) and read consultations only through `client_consultations` / `billing_consultations`, never the base table. New data needs go in a new `app_*` function with checks in `supabase/tests/api_checks.sql`; `test/api-contract.test.ts` checks the calls match.
+  - `SUPABASE_SECRET_KEY` (bypasses row-level security) is used only for Supabase Auth's invite API in `lib/supabase/server.ts`. Never use it to read or write data.
   - Every reporting page uses `resolvePeriod` + `<PeriodPicker>` and states the period ("Showing 1–10 Nov 2026"). Figures that are "as of today" (balances, amounts owed) say so.
   - Server components by default; client components only for interactivity (e.g. the upload form). Pages must work at phone width.
   - `HC247_DEMO_MODE=true` enables demo data and the demo sign-in. It must never be set in production.

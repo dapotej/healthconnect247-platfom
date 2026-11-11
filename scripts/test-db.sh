@@ -38,5 +38,6 @@ for migration in "$ROOT"/supabase/migrations/*.sql; do
 done
 run_sql "$ROOT/supabase/seed.sql"
 run_sql "$ROOT/supabase/tests/access_rules.sql"
+run_sql "$ROOT/supabase/tests/api_checks.sql"
 
 echo "Database tests passed"

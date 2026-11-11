@@ -14,5 +14,6 @@ supabase/.temp/
 /imports/
 *.csv
 *.xlsx
+!apps/web/test/fixtures/*.xlsx
 !packages/core/test/fixtures/*.csv
 *.tsbuildinfo

@@ -5,6 +5,7 @@ import type {
   ConsultationOutcome,
   ConsultationType,
   Contract,
+  DiagnosisCodeSystem,
   InvoiceDraft,
   InvoiceLine,
   Kobo,
@@ -20,6 +21,8 @@ export interface Client {
   name: string;
   type: ClientType;
   isPilot: boolean;
+  /** Names this client goes by in the EMR export's service column. */
+  emrNames: string[];
 }
 
 export interface Member {
@@ -127,6 +130,45 @@ export interface StaffMember {
   status: 'invited' | 'active' | 'disabled';
 }
 
+/** What's needed to match an imported consultation to a member. */
+export interface MemberIndexRow {
+  id: string;
+  externalMemberId: string;
+  phoneE164: string;
+  patientCode: string | null;
+}
+
+/** A consultation from the EMR, matched and priced, ready to save. Never carries clinical notes. */
+export interface ImportedConsultation {
+  clientId: string;
+  memberId: string;
+  contractId: string;
+  externalRef: string;
+  occurredAt: string;
+  type: ConsultationType;
+  channel: Channel | null;
+  language: CallLanguage | null;
+  clinicianName: string | null;
+  clinicianLicence: string | null;
+  diagnosisCode: string | null;
+  diagnosisCodeSystem: DiagnosisCodeSystem;
+  diagnosisLabel: string | null;
+  outcome: ConsultationOutcome | null;
+  chargeKobo: Kobo;
+  billing: BillingMethod;
+}
+
+export interface ConsultationImportRecord {
+  id: string;
+  filename: string;
+  importedAt: string;
+  rowsTotal: number;
+  imported: number;
+  skippedDuplicates: number;
+  /** Rows not imported, with the reason (including encounters not finished yet). */
+  problems: RowError[];
+}
+
 export interface MemberImportSummary {
   filename: string;
   uploadedAt: string;
@@ -175,6 +217,21 @@ export interface DataSource {
   sendInvoice(id: string, dueOn: string): Promise<Invoice>;
   /** Adds a payment; the invoice becomes part-paid or paid. Refuses overpayment. */
   recordPayment(id: string, payment: InvoicePayment): Promise<Invoice>;
+
+  setClientEmrNames(clientId: string, names: string[]): Promise<void>;
+  memberIndex(clientId: string): Promise<MemberIndexRow[]>;
+  /** Which of these EMR references were imported before. */
+  existingConsultationRefs(refs: string[]): Promise<Set<string>>;
+  recordConsultationImport(input: {
+    filename: string;
+    rowsTotal: number;
+    consultations: ImportedConsultation[];
+    memberCodes: Array<{ memberId: string; patientCode: string }>;
+    problems: RowError[];
+    /** Rows skipped before saving because they were imported before. */
+    alreadyImported: number;
+  }): Promise<{ id: string; imported: number; skippedDuplicates: number }>;
+  consultationImports(limit: number): Promise<ConsultationImportRecord[]>;
 
   listStaff(): Promise<StaffMember[]>;
   inviteStaff(input: Omit<StaffMember, 'id' | 'status'>): Promise<StaffMember>;

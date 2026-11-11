@@ -161,3 +161,9 @@ table.data .restricted { color: var(--muted); font-style: italic; }
 .signin .account { width: 100%; text-align: left; padding: 14px 16px; border-radius: 12px; border: 1px solid var(--line); background: var(--paper); cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
 .signin .account:hover { border-color: var(--blue); }
 @media (max-width: 900px) { .signin { grid-template-columns: minmax(0, 1fr); } .signin .brand-side { padding: 32px 20px; } }
+
+/* Import summaries */
+.card > .card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; margin: 0 0 12px; }
+.facts dt { font-size: 12px; color: var(--muted); }
+.facts dd { margin: 0; font-size: 18px; }

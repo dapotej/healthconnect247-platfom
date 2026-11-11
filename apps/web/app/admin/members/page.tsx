@@ -19,7 +19,15 @@ export default async function AdminMembersPage({ searchParams }: { searchParams:
   const params = await searchParams;
   const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
   const clients = await data.listClients();
-  const client = clients.find((c) => c.id === one(params.client)) ?? clients[0]!;
+  const client = clients.find((c) => c.id === one(params.client)) ?? clients[0];
+  if (!client) {
+    return (
+      <Shell product="Admin console" user={user} nav={ADMIN_NAV} active="members">
+        <PageHead title="Members" subtitle="No clients yet" />
+        <p className="banner info">Members are listed here once a client is set up.</p>
+      </Shell>
+    );
+  }
   const filter: MemberFilter = (['active', 'suspended', 'not_on_app'] as const).find((f) => f === one(params.filter)) ?? 'active';
   const query = one(params.q)?.slice(0, 80) ?? '';
   const page = Math.max(1, Number(one(params.page)) || 1);

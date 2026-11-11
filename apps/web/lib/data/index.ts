@@ -1,8 +1,11 @@
+import { supabaseConfig } from '../supabase/config';
 import { demoDataSource } from './demo';
+import { supabaseDataSource } from './supabase';
 import type { DataSource } from './types';
 
 export * from './types';
 
+/** Demo data and demo sign-in. Never set HC247_DEMO_MODE in production. */
 export function isDemoMode(): boolean {
   return process.env.HC247_DEMO_MODE === 'true';
 }
@@ -15,7 +18,6 @@ export function now(): string {
 
 export function getData(): DataSource {
   if (isDemoMode()) return demoDataSource;
-  // The Supabase data source is added once the project exists. Until then the
-  // app only runs in demo mode.
-  throw new Error('No data source configured. Set HC247_DEMO_MODE=true for local development.');
+  if (supabaseConfig()) return supabaseDataSource;
+  throw new Error('No data source configured. Set the Supabase variables (see .env.example), or HC247_DEMO_MODE=true for local demos.');
 }

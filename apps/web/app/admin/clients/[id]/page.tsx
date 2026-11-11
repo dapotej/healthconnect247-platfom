@@ -8,7 +8,10 @@ import { invoiceBadge } from '@/lib/billing';
 import { getData, now } from '@/lib/data';
 import { compactNaira, formatNaira, formatNumber, plural, PRICING_LABELS, TYPE_LABELS } from '@/lib/format';
 import { formatRange, resolvePeriod } from '@/lib/period';
-import { requireStaff } from '@/lib/session';
+import { can, requireStaff, type SessionUser } from '@/lib/session';
+import { Notice } from '@/components/Notice';
+import { setEmrNamesAction } from '@/app/admin/actions';
+import type { Client } from '@/lib/data/types';
 
 type Params = Promise<{ id: string }>;
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -21,8 +24,20 @@ export default async function ClientDetailPage({ params, searchParams }: { param
   if (!client) notFound();
   const nowIso = now();
   const today = lagosDate(nowIso);
-  const period = resolvePeriod(await searchParams, nowIso);
-  const summary = (await clientSummaries(data, period.from, period.to, nowIso)).find((s) => s.client.id === id)!;
+  const query = await searchParams;
+  const period = resolvePeriod(query, nowIso);
+  const summary = (await clientSummaries(data, period.from, period.to, nowIso)).find((s) => s.client.id === id);
+  if (!summary) {
+    return (
+      <Shell product="Admin console" user={user} nav={ADMIN_NAV} active="clients">
+        <div className="small"><a href="/admin/clients">Clients</a> / {client.name}</div>
+        <PageHead title={client.name} subtitle="No contract yet" />
+        <Notice params={query} />
+        <p className="banner info">This client has no contract yet, so there’s no usage or billing to show.</p>
+        <EmrNames client={client} user={user} />
+      </Shell>
+    );
+  }
   const { contract } = summary;
   const usage = usageByType(summary.consultations);
   const rate = (t: ConsultationType) => contract.rates[t];
@@ -36,6 +51,7 @@ export default async function ClientDetailPage({ params, searchParams }: { param
       >
         <PeriodPicker period={period} basePath={`/admin/clients/${id}`} />
       </PageHead>
+      <Notice params={query} />
 
       <div className="kpis">
         {summary.creditKobo !== null && (
@@ -119,6 +135,32 @@ export default async function ClientDetailPage({ params, searchParams }: { param
           </div>
         </section>
       </div>
+      <EmrNames client={client} user={user} />
     </Shell>
+  );
+}
+
+/** The names this client goes by in the EMR export, used to match imported consultations. */
+function EmrNames({ client, user }: { client: Client; user: SessionUser }) {
+  return (
+    <section className="card stack" style={{ gap: 10, marginTop: 16, maxWidth: 560 }}>
+      <h2 style={{ margin: 0, fontSize: 16 }}>Names in the EMR</h2>
+      <p className="small muted" style={{ margin: 0 }}>
+        How this client appears in the EMR export’s service column. Consultations are matched to the client by these names.
+      </p>
+      {can.manageMembers(user) ? (
+        <form action={setEmrNamesAction} className="stack" style={{ gap: 8 }}>
+          <input type="hidden" name="clientId" value={client.id} />
+          <input type="hidden" name="back" value={`/admin/clients/${client.id}`} />
+          <div className="field">
+            <label htmlFor="emr-names">Names, separated by commas</label>
+            <input id="emr-names" className="input" name="names" defaultValue={client.emrNames.join(', ')} maxLength={500} />
+          </div>
+          <button className="btn btn-small" type="submit">Save names</button>
+        </form>
+      ) : (
+        <p className="strong" style={{ margin: 0 }}>{client.emrNames.length ? client.emrNames.join(', ') : 'None yet'}</p>
+      )}
+    </section>
   );
 }

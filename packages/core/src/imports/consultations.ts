@@ -60,7 +60,7 @@ export const CONSULTATION_COLUMN_ALIASES: Record<ConsultationField, string[]> = 
   outcome: ['encounter clinicaloutcome', 'doctornote clinicaloutcome', 'outcome', 'disposition', 'result', 'call outcome'],
 };
 
-const REQUIRED: ConsultationField[] = ['externalRef', 'occurredAt', 'type'];
+const REQUIRED: ConsultationField[] = ['externalRef', 'occurredAt'];
 
 export interface NormalizedConsultation {
   row: number;
@@ -173,6 +173,7 @@ export function parseConsultationTable(table: CsvTable, options: ParseOptions = 
   const codeSystem = options.codeSystem ?? 'icd11';
   const cols = resolveColumns(table.headers, CONSULTATION_COLUMN_ALIASES, options.columnOverrides ?? {});
   const missing: string[] = REQUIRED.filter((f) => cols[f] === undefined);
+  if (cols.type === undefined && cols.subtype === undefined) missing.push('type');
   if (cols.memberId === undefined && cols.phone === undefined && cols.patientCode === undefined) {
     missing.push('member ID, patient code or phone');
   }

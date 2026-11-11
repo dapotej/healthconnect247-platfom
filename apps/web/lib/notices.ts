@@ -15,6 +15,23 @@ const NOTICES: Record<string, { tone: 'info' | 'warn'; text: (n?: string) => str
   topup_recorded: { tone: 'info', text: () => 'Top-up recorded. The client’s credit is available straight away.' },
   staff_invited: { tone: 'info', text: () => 'Invitation recorded. They’ll get an email to set a password once sign-in is connected.' },
 
+  import_done: {
+    tone: 'info',
+    text: (n) => (n === '1' ? '1 consultation imported. Rows that weren’t imported are listed below.' : `${n ?? 'The'} consultations imported. Rows that weren’t imported are listed below.`),
+  },
+  bad_file: { tone: 'warn', text: () => 'Upload the EMR export as an Excel (.xlsx) or CSV file, up to 10 MB.' },
+  emr_missing_columns: { tone: 'warn', text: () => 'That file doesn’t look like the EMR encounters export: the encounter ID, date or type column is missing.' },
+  emr_names_saved: { tone: 'info', text: () => 'EMR names saved. Imports will match this client by them.' },
+  reset_sent: { tone: 'info', text: () => 'If that email has an account, we’ve sent a link to set a new password. It works once, for an hour.' },
+  password_set: { tone: 'info', text: () => 'Password saved. You’re signed in.' },
+  signed_out: { tone: 'info', text: () => 'You’ve signed out.' },
+
+  bad_credentials: { tone: 'warn', text: () => 'That email and password don’t match an account. Check them, or set a new password.' },
+  no_access: { tone: 'warn', text: () => 'Your account doesn’t have access to this site. Ask HealthConnect operations to check your role.' },
+  link_expired: { tone: 'warn', text: () => 'That link has expired or was already used. Ask for a new one below.' },
+  weak_password: { tone: 'warn', text: () => 'Use at least 10 characters, and type the same password twice.' },
+  emr_name_taken: { tone: 'warn', text: () => 'One of those EMR names already belongs to another client.' },
+  invites_unavailable: { tone: 'warn', text: () => 'Invitations can’t be sent yet: the server key isn’t set up. See the setup notes.' },
   bad_amount: { tone: 'warn', text: () => 'Enter an amount in naira, for example 5,000,000.' },
   bad_date: { tone: 'warn', text: () => 'Enter a valid date that isn’t in the future.' },
   bad_month: { tone: 'warn', text: () => 'Choose a month to invoice.' },

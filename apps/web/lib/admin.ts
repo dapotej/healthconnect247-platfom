@@ -9,6 +9,7 @@ export const ADMIN_NAV: NavItem[] = [
   { key: 'clients', href: '/admin/clients', label: 'Clients' },
   { key: 'members', href: '/admin/members', label: 'Members' },
   { key: 'billing', href: '/admin/billing', label: 'Billing' },
+  { key: 'imports', href: '/admin/imports', label: 'Imports' },
   { key: 'staff', href: '/admin/staff', label: 'Staff' },
 ];
 
@@ -27,6 +28,7 @@ export interface ClientSummary {
 }
 
 /** Per-client figures for a period, read through the billing view (no diagnoses). */
+/** Clients with a contract, and what they used in the period. Clients with no contract yet are left out. */
 export async function clientSummaries(data: DataSource, from: string, to: string, nowIso: string): Promise<ClientSummary[]> {
   const today = lagosDate(nowIso);
   const [clients, consultations, invoices] = await Promise.all([
@@ -34,10 +36,11 @@ export async function clientSummaries(data: DataSource, from: string, to: string
     data.billingConsultations(from, to),
     data.invoices(),
   ]);
-  return Promise.all(
-    clients.map(async (client) => {
+  const summaries = await Promise.all(
+    clients.map(async (client): Promise<ClientSummary | null> => {
       const contracts = await data.contractsFor(client.id);
-      const contract = contractOn(contracts, nowIso) ?? contracts[0]!;
+      const contract = contractOn(contracts, nowIso) ?? contracts.at(-1);
+      if (!contract) return null;
       const members = await data.memberCounts(client.id);
       const mine = consultations.filter((c) => c.clientId === client.id);
       const theirInvoices = invoices.filter((i) => i.clientId === client.id);
@@ -65,6 +68,7 @@ export async function clientSummaries(data: DataSource, from: string, to: string
       };
     }),
   );
+  return summaries.filter((s): s is ClientSummary => s !== null);
 }
 
 export function daysUntil(date: string, today: string): number {

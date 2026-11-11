@@ -1,6 +1,8 @@
 'use server';
 
-import { buildInvoice, contractOn, lagosDate, LANGUAGES, MissingColumnsError, parseNairaInput, validateMemberList, type CallLanguage } from '@hc247/core';
+import { buildInvoice, contractOn, lagosDate, LANGUAGES, MissingColumnsError, parseConsultationTable, parseNairaInput, validateMemberList, type CallLanguage } from '@hc247/core';
+import { runEmrImport } from '@/lib/emr-import';
+import { readTable } from '@/lib/spreadsheet';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import type { UploadState } from '@/app/portal/members/actions';
@@ -183,5 +185,37 @@ export async function inviteStaffAction(form: FormData) {
     if (LICENSED.includes(role) && (!licenceNumber || !licenceExpiresOn)) return 'bad_licence';
     await getData().inviteStaff({ fullName, email, role, languages: languages.length ? languages : ['english'], licenceNumber, licenceExpiresOn });
     return 'staff_invited';
+  });
+}
+
+// ── EMR consultation import ─────────────────────────────────────────────
+
+export async function importConsultationsAction(form: FormData) {
+  const back = '/admin/imports';
+  await run(back, async () => {
+    if (!(await staffWho(can.importConsultations))) return 'not_allowed';
+    const file = form.get('file');
+    if (!(file instanceof File) || file.size === 0) return 'bad_file';
+    if (file.size > 10 * 1024 * 1024 || !/\.(xlsx|csv)$/i.test(file.name)) return 'bad_file';
+    let parsed;
+    try {
+      parsed = parseConsultationTable(await readTable(file));
+    } catch (err) {
+      if (err instanceof MissingColumnsError) return 'emr_missing_columns';
+      return 'bad_file';
+    }
+    const result = await runEmrImport(getData(), file.name.slice(0, 200), parsed);
+    return { notice: 'import_done', n: result.imported };
+  });
+}
+
+export async function setEmrNamesAction(form: FormData) {
+  const clientId = field(form, 'clientId');
+  const back = backTo(form.get('back'), '/admin/clients');
+  await run(back, async () => {
+    if (!(await staffWho(can.manageMembers))) return 'not_allowed';
+    const names = field(form, 'names').split(/[\n,]/).map((n) => n.trim()).filter(Boolean).slice(0, 20);
+    await getData().setClientEmrNames(clientId, names);
+    return 'emr_names_saved';
   });
 }
