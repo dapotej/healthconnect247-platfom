@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.next/
+coverage/
+*.log
+.env
+.env.*
+!.env.example
+.DS_Store
+# Supabase local state
+supabase/.branches/
+supabase/.temp/
+# Never commit real member or patient exports
+/imports/
+*.csv
+*.xlsx
+!packages/core/test/fixtures/*.csv
