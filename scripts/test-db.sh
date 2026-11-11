@@ -31,11 +31,11 @@ run_sql() {
 }
 
 run_sql "$ROOT/supabase/tests/auth_shim.sql"
+run_sql "$ROOT/supabase/tests/grants_shim.sql"
 for migration in "$ROOT"/supabase/migrations/*.sql; do
   echo "Applying $(basename "$migration")"
   run_sql "$migration"
 done
-run_sql "$ROOT/supabase/tests/grants_shim.sql"
 run_sql "$ROOT/supabase/seed.sql"
 run_sql "$ROOT/supabase/tests/access_rules.sql"
 

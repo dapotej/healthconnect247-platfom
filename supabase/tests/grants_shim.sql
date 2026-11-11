@@ -1,7 +1,8 @@
--- Supabase grants table privileges to the API roles by default and relies on
--- row-level security for access control. Reproduce that locally.
+-- Supabase gives the API roles full rights on every new table, view, sequence
+-- and function in the public schema, and relies on row-level security for
+-- access control. Reproduce that locally, before the migrations run, so the
+-- migrations must revoke anything they don't want exposed, as on Supabase.
 grant usage on schema public to anon, authenticated;
-grant select, insert, update, delete on all tables in schema public to authenticated;
-grant usage on all sequences in schema public to authenticated;
--- The views revoke anon in the migration; re-assert it after the blanket grant.
-revoke all on public.client_consultations, public.billing_consultations, public.client_credit_balances from anon;
+alter default privileges in schema public grant all on tables to anon, authenticated;
+alter default privileges in schema public grant all on sequences to anon, authenticated;
+alter default privileges in schema public grant all on functions to anon, authenticated;

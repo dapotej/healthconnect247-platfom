@@ -377,5 +377,8 @@ from public.credit_ledger l
 where public.has_role('ops_admin', 'finance') or l.client_id = public.current_client_id()
 group by l.client_id;
 
-revoke all on public.client_consultations, public.billing_consultations, public.client_credit_balances from anon;
+-- Supabase grants every API role full rights on new views by default. These
+-- views run with the owner's rights, so a write through one would skip the
+-- table's row-level security: allow reading only, and only when signed in.
+revoke all on public.client_consultations, public.billing_consultations, public.client_credit_balances from public, anon, authenticated;
 grant select on public.client_consultations, public.billing_consultations, public.client_credit_balances to authenticated;

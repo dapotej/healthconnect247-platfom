@@ -14,6 +14,17 @@ begin
 end $$;
 grant execute on function tests.expect(text, bigint, bigint) to authenticated;
 
+-- Expect a statement to be refused for lack of privileges.
+create function tests.expect_denied(label text, statement text) returns void
+language plpgsql as $$
+begin
+  execute statement;
+  raise exception 'FAILED: % (statement was allowed)', label;
+exception when insufficient_privilege then
+  raise notice 'ok: %', label;
+end $$;
+grant execute on function tests.expect_denied(text, text) to anon, authenticated;
+
 -- Act as a signed-in user.
 create function tests.login(user_id uuid) returns void
 language plpgsql as $$
@@ -127,6 +138,20 @@ select tests.login('d0000000-0000-0000-0000-000000000001');
 select tests.expect('ops cannot read diagnoses in the consultations table', (select count(*) from public.consultations), 0);
 select tests.expect('ops sees every consultation in the billing view', (select count(*) from public.billing_consultations), 3);
 select tests.expect('ops sees every client', (select count(*) from public.clients), 5);
+select tests.expect_denied('ops cannot change charges through the billing view', 'update public.billing_consultations set charge_kobo = 0');
+select tests.expect_denied('ops cannot delete through the billing view', 'delete from public.billing_consultations');
+reset role;
+
+select tests.login('a0000000-0000-0000-0000-000000000001');
+select tests.expect('client has no write rights on the client view', (select count(*) from unnest(array['INSERT','UPDATE','DELETE']) p where has_table_privilege('public.client_consultations', p)), 0);
+reset role;
+
+-- Signed-out visitors (the API's anon role) see nothing.
+grant usage on schema tests to anon;
+set role anon;
+select tests.expect_denied('signed-out visitor cannot read the client view', 'select 1 from public.client_consultations');
+select tests.expect_denied('signed-out visitor cannot read the billing view', 'select 1 from public.billing_consultations');
+select tests.expect_denied('signed-out visitor cannot read credit balances', 'select 1 from public.client_credit_balances');
 reset role;
 
 select tests.login('d0000000-0000-0000-0000-000000000002');
