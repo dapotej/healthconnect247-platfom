@@ -64,3 +64,14 @@ export async function requireStaff(): Promise<SessionUser> {
 export function canSeeInvoices(user: SessionUser): boolean {
   return user.role !== 'client_viewer';
 }
+
+/**
+ * What each staff role may change. These mirror the database's row-level
+ * security policies; the database is the final check.
+ */
+export const can = {
+  manageMembers: (u: SessionUser) => u.role === 'ops_admin',
+  manageInvoices: (u: SessionUser) => u.role === 'finance',
+  recordTopUps: (u: SessionUser) => u.role === 'ops_admin' || u.role === 'finance',
+  manageStaff: (u: SessionUser) => u.role === 'ops_admin',
+};

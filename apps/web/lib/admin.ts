@@ -7,6 +7,9 @@ import { addDays } from './period';
 export const ADMIN_NAV: NavItem[] = [
   { key: 'overview', href: '/admin', label: 'Overview' },
   { key: 'clients', href: '/admin/clients', label: 'Clients' },
+  { key: 'members', href: '/admin/members', label: 'Members' },
+  { key: 'billing', href: '/admin/billing', label: 'Billing' },
+  { key: 'staff', href: '/admin/staff', label: 'Staff' },
 ];
 
 export interface ClientSummary {

@@ -4,6 +4,7 @@ import { PageHead } from '@/components/Widgets';
 import type { MemberFilter } from '@/lib/data/types';
 import { formatLagosDateTime, formatNumber } from '@/lib/format';
 import { portalContext, portalNav } from '@/lib/portal';
+import { uploadMembersAction } from './actions';
 import { UploadForm } from './UploadForm';
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -104,7 +105,7 @@ export default async function MembersPage({ searchParams }: { searchParams: Sear
             <h2>Update your member list</h2>
             {isAdmin ? (
               <>
-                <UploadForm />
+                <UploadForm action={uploadMembersAction} />
                 <span className="small muted">
                   New members are added and existing ones updated. Members missing from the file are not removed automatically.
                   Columns needed: name, member ID and phone number; date of birth and plan are optional.

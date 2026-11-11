@@ -11,7 +11,7 @@ Telemedicine for Nigerian HMOs, employers and state health schemes: a client por
 | Call-centre export import | Parser done with guessed column names; waiting for a real export sample |
 | Database schema and access rules (`supabase/`) | Done, tested locally |
 | Client portal (`apps/web/app/portal`): dashboard, members and upload, consultations and claims export, billing and credit | Done, running on demo data |
-| Admin console (`apps/web/app/admin`): overview, clients, client details | First screens done, running on demo data |
+| Admin console (`apps/web/app/admin`): overview, clients, client details, members (upload, suspend), billing (create, send and record payments on invoices; Flex top-ups), staff (licences, invitations) | Done, running on demo data |
 | Supabase data source and real sign-in | Next, once the Supabase project exists |
 | Clinician console | Later |
 | Member app (`apps/mobile`) | Later |

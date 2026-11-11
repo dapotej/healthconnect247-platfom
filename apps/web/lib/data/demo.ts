@@ -31,7 +31,9 @@ import type {
   MemberCounts,
   MemberFilter,
   MemberImportSummary,
+  StaffMember,
 } from './types';
+import { DataRuleError } from './types';
 
 // ── Seeded randomness ────────────────────────────────────────────────────
 function mulberry32(seed: number) {
@@ -166,6 +168,7 @@ interface DemoStore {
   ledgers: Map<string, LedgerRow[]>;
   invoices: Invoice[];
   imports: Map<string, MemberImportSummary>;
+  staff: StaffMember[];
 }
 
 function randomTime(rng: Rng, day: string): string {
@@ -333,23 +336,48 @@ function build(): DemoStore {
       periodStart: from,
       periodEnd: to,
       status,
+      lines: draft.lines,
       subtotalKobo: draft.subtotalKobo,
+      vatKobo: draft.vatKobo,
       totalKobo: draft.totalKobo,
-      paidKobo: status === 'paid' ? draft.totalKobo : 0,
+      paidKobo: 0,
       dueOn: null,
       paidOn: null,
+      payments: [],
       ...extra,
     };
   };
   const spec = (id: string) => SPECS.find((s) => s.client.id === id)!;
+  const pay = (inv: Invoice, amountKobo: number, paidOn: string, reference: string) => {
+    inv.payments.push({ amountKobo, paidOn, reference });
+    inv.paidKobo += amountKobo;
+    if (inv.paidKobo === inv.totalKobo) inv.paidOn = paidOn;
+    return inv;
+  };
   const lagosOct = invoice(spec('lagos-state'), 'INV-0140', '2026-10-01', '2026-10-31', 'part_paid', { dueOn: '2026-10-15' });
-  lagosOct.paidKobo = lagosOct.totalKobo - 480_000_000;
+  pay(lagosOct, lagosOct.totalKobo - 480_000_000, '2026-10-24', 'LASG-TRF-0912');
+  const lagosNov = invoice(spec('lagos-state'), 'INV-0151', '2026-11-01', '2026-11-30', 'paid', { dueOn: '2026-11-15' });
+  pay(lagosNov, lagosNov.totalKobo, '2026-11-03', 'LASG-TRF-0988');
+  // INV-0156 is [HMO B]'s November invoice, still being prepared.
   const invoices: Invoice[] = [
     invoice(spec('hmo-b'), 'INV-0156', '2026-11-01', '2026-11-30', 'draft'),
-    invoice(spec('lagos-state'), 'INV-0151', '2026-11-01', '2026-11-30', 'paid', { dueOn: '2026-11-15', paidOn: '2026-11-03' }),
+    lagosNov,
     invoice(spec('hmo-d'), 'INV-0149', '2026-10-01', '2026-10-31', 'sent', { dueOn: '2026-11-15' }),
     invoice(spec('hmo-b'), 'INV-0142', '2026-10-01', '2026-10-31', 'sent', { dueOn: '2026-10-20' }),
     lagosOct,
+  ];
+
+  const staff: StaffMember[] = [
+    { id: 'st-1', fullName: 'Tola Bankole', email: 'tola.bankole@[company-domain]', role: 'ops_admin', languages: ['english', 'yoruba'], licenceNumber: null, licenceExpiresOn: null, status: 'active' },
+    { id: 'st-2', fullName: '[Finance officer]', email: 'finance@[company-domain]', role: 'finance', languages: ['english'], licenceNumber: null, licenceExpiresOn: null, status: 'active' },
+    { id: 'st-3', fullName: 'Dr Kunle Bello', email: 'k.bello@[company-domain]', role: 'clinical_lead', languages: ['english', 'yoruba'], licenceNumber: 'MDCN/[number]', licenceExpiresOn: '2026-11-28', status: 'active' },
+    { id: 'st-4', fullName: 'Dr Funmilayo Adeyemi', email: 'f.adeyemi@[company-domain]', role: 'gp', languages: ['english', 'yoruba'], licenceNumber: 'MDCN/[number]', licenceExpiresOn: '2027-03-31', status: 'active' },
+    { id: 'st-5', fullName: 'Dr Ifeoma Nwankwo', email: 'i.nwankwo@[company-domain]', role: 'gp', languages: ['english', 'igbo'], licenceNumber: 'MDCN/[number]', licenceExpiresOn: '2027-01-31', status: 'active' },
+    { id: 'st-6', fullName: 'Dr Usman Garba', email: 'u.garba@[company-domain]', role: 'gp', languages: ['english', 'hausa'], licenceNumber: 'MDCN/[number]', licenceExpiresOn: '2026-12-02', status: 'active' },
+    { id: 'st-7', fullName: 'Dr Adaobi Okafor', email: 'a.okafor@[company-domain]', role: 'gp', languages: ['english', 'igbo'], licenceNumber: 'MDCN/[number]', licenceExpiresOn: '2026-10-31', status: 'active' },
+    { id: 'st-8', fullName: 'Adaeze Kalu', email: 'a.kalu@[company-domain]', role: 'therapist', languages: ['english', 'igbo'], licenceNumber: '[licence]', licenceExpiresOn: '2027-08-31', status: 'active' },
+    { id: 'st-9', fullName: 'Chioma Nwosu', email: 'c.nwosu@[company-domain]', role: 'coordinator', languages: ['english', 'igbo'], licenceNumber: null, licenceExpiresOn: null, status: 'active' },
+    { id: 'st-10', fullName: 'Ibrahim Sule', email: 'i.sule@[company-domain]', role: 'coordinator', languages: ['english', 'hausa'], licenceNumber: null, licenceExpiresOn: null, status: 'invited' },
   ];
 
   const imports = new Map<string, MemberImportSummary>([
@@ -367,7 +395,7 @@ function build(): DemoStore {
     }],
   ]);
 
-  return { members, membersByClient, consultations, ledgers, invoices, imports };
+  return { members, membersByClient, consultations, ledgers, invoices, imports, staff };
 }
 
 // Keep one store across hot reloads in development.
@@ -497,10 +525,88 @@ export const demoDataSource: DataSource = {
       );
   },
 
+  async setMemberStatus(clientId, memberId, status) {
+    const member = store().membersByClient.get(clientId)?.find((m) => m.id === memberId);
+    if (!member) throw new DataRuleError('member_not_found', 'Member not found for this client');
+    member.status = status;
+  },
+
   async creditLedger(clientId) {
     return store().ledgers.get(clientId) ?? [];
   },
+  async recordTopUp(clientId, top) {
+    const spec = SPECS.find((s) => s.client.id === clientId);
+    if (spec?.contract.pricingModel !== 'flex') throw new DataRuleError('not_flex', 'Only Flex Credits clients have credit to top up');
+    const ledger = store().ledgers.get(clientId) ?? [];
+    ledger.push({ occurredAt: `${top.receivedOn}T12:00:00+01:00`, kind: 'topup', amountKobo: top.amountKobo, reference: top.reference, note: 'Top-up received' });
+    store().ledgers.set(clientId, ledger);
+  },
+
   async invoices(clientId) {
-    return store().invoices.filter((i) => !clientId || i.clientId === clientId);
+    return store()
+      .invoices.filter((i) => !clientId || i.clientId === clientId)
+      .sort((a, b) => b.number.localeCompare(a.number));
+  },
+  async getInvoice(id) {
+    return store().invoices.find((i) => i.id === id) ?? null;
+  },
+  async createInvoiceDraft(clientId, draft) {
+    const s = store();
+    if (s.invoices.some((i) => i.clientId === clientId && i.periodStart === draft.periodStart && i.status !== 'void')) {
+      throw new DataRuleError('invoice_exists', 'This client already has an invoice for that period');
+    }
+    const next = Math.max(0, ...s.invoices.map((i) => Number(i.number.replace(/\D/g, '')))) + 1;
+    const number = `INV-${String(next).padStart(4, '0')}`;
+    const inv: Invoice = {
+      id: number,
+      clientId,
+      number,
+      periodStart: draft.periodStart,
+      periodEnd: draft.periodEnd,
+      status: 'draft',
+      lines: draft.lines,
+      subtotalKobo: draft.subtotalKobo,
+      vatKobo: draft.vatKobo,
+      totalKobo: draft.totalKobo,
+      paidKobo: 0,
+      dueOn: null,
+      paidOn: null,
+      payments: [],
+    };
+    s.invoices.push(inv);
+    return inv;
+  },
+  async sendInvoice(id, dueOn) {
+    const inv = store().invoices.find((i) => i.id === id);
+    if (!inv) throw new DataRuleError('invoice_not_found', 'Invoice not found');
+    if (inv.status !== 'draft') throw new DataRuleError('not_draft', 'Only invoices being prepared can be sent');
+    inv.status = 'sent';
+    inv.dueOn = dueOn;
+    return inv;
+  },
+  async recordPayment(id, payment) {
+    // Same rules as the apply_invoice_payment trigger in the database.
+    const inv = store().invoices.find((i) => i.id === id);
+    if (!inv) throw new DataRuleError('invoice_not_found', 'Invoice not found');
+    if (inv.status === 'draft' || inv.status === 'void') throw new DataRuleError('not_sent', 'This invoice has not been sent, so it cannot be paid');
+    if (inv.paidKobo + payment.amountKobo > inv.totalKobo) throw new DataRuleError('overpayment', 'That is more than the amount still owed');
+    inv.payments.push(payment);
+    inv.paidKobo += payment.amountKobo;
+    inv.status = inv.paidKobo === inv.totalKobo ? 'paid' : 'part_paid';
+    if (inv.status === 'paid') inv.paidOn = payment.paidOn;
+    return inv;
+  },
+
+  async listStaff() {
+    return store().staff;
+  },
+  async inviteStaff(input) {
+    const s = store();
+    if (s.staff.some((m) => m.email.toLowerCase() === input.email.toLowerCase())) {
+      throw new DataRuleError('staff_exists', 'Someone with this email is already on the team');
+    }
+    const member: StaffMember = { ...input, id: `st-${s.staff.length + 1}`, status: 'invited' };
+    s.staff.push(member);
+    return member;
   },
 };

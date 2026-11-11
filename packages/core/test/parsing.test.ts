@@ -8,6 +8,8 @@ import {
   parseConsultationExport,
   parseDate,
   parseLagosDateTime,
+  parseNairaInput,
+  formatNaira,
   validateMemberList,
 } from '../src/index.js';
 
@@ -27,6 +29,27 @@ describe('phone numbers', () => {
 
   it('masks for display', () => {
     expect(maskPhone('+2348034567812')).toBe('+234 803 *** **12');
+  });
+});
+
+describe('naira amounts typed into forms', () => {
+  it.each([
+    ['5,000,000', 500_000_000],
+    ['₦4,278,000.50', 427_800_050],
+    ['NGN 700', 70_000],
+    ['0.5', 50],
+  ])('reads %s', (input, kobo) => {
+    expect(parseNairaInput(input)).toBe(kobo);
+  });
+
+  it.each(['', '0', '-500', '5.123', 'abc', '1e6', '20,000,000,000'])('refuses %s', (input) => {
+    expect(parseNairaInput(input)).toBeNull();
+  });
+
+  it('displays kobo with two digits, and whole naira without', () => {
+    expect(formatNaira(427_800_000)).toBe('₦4,278,000');
+    expect(formatNaira(9_413_250)).toBe('₦94,132.50');
+    expect(formatNaira(5)).toBe('₦0.05');
   });
 });
 

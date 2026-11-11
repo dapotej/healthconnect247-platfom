@@ -2,6 +2,16 @@ import type { Invoice } from './data/types';
 import { compactNaira } from './format';
 import { shortDay } from './period';
 
+/** Payments received between two Lagos dates (inclusive). */
+export function collectedBetween(invoices: Invoice[], from: string, to: string): number {
+  return invoices.flatMap((i) => i.payments).filter((p) => p.paidOn >= from && p.paidOn <= to).reduce((s, p) => s + p.amountKobo, 0);
+}
+
+/** Invoices whose billing month starts within the period, excluding drafts and cancelled ones. */
+export function invoicedBetween(invoices: Invoice[], from: string, to: string): Invoice[] {
+  return invoices.filter((i) => i.status !== 'draft' && i.status !== 'void' && i.periodStart >= from && i.periodStart <= to);
+}
+
 export function owedKobo(inv: Invoice): number {
   return inv.status === 'sent' || inv.status === 'part_paid' ? inv.totalKobo - inv.paidKobo : 0;
 }

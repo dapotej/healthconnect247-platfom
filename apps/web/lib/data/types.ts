@@ -5,6 +5,8 @@ import type {
   ConsultationOutcome,
   ConsultationType,
   Contract,
+  InvoiceDraft,
+  InvoiceLine,
   Kobo,
   LedgerKind,
   NormalizedMember,
@@ -94,11 +96,34 @@ export interface Invoice {
   periodStart: string;
   periodEnd: string;
   status: InvoiceStatus;
+  lines: InvoiceLine[];
   subtotalKobo: Kobo;
+  vatKobo: Kobo;
   totalKobo: Kobo;
   paidKobo: Kobo;
   dueOn: string | null;
+  /** Date the invoice became fully paid. */
   paidOn: string | null;
+  payments: InvoicePayment[];
+}
+
+export interface InvoicePayment {
+  amountKobo: Kobo;
+  paidOn: string;
+  reference: string | null;
+}
+
+export type StaffRole = 'ops_admin' | 'finance' | 'clinical_lead' | 'coordinator' | 'gp' | 'therapist';
+
+export interface StaffMember {
+  id: string;
+  fullName: string;
+  email: string;
+  role: StaffRole;
+  languages: CallLanguage[];
+  licenceNumber: string | null;
+  licenceExpiresOn: string | null;
+  status: 'invited' | 'active' | 'disabled';
 }
 
 export interface MemberImportSummary {
@@ -138,6 +163,29 @@ export interface DataSource {
   /** Staff billing view, optionally for one client. */
   billingConsultations(from: string, to: string, clientId?: string): Promise<BillingConsultation[]>;
 
+  setMemberStatus(clientId: string, memberId: string, status: Member['status']): Promise<void>;
+
   creditLedger(clientId: string): Promise<LedgerRow[]>;
+  recordTopUp(clientId: string, top: { amountKobo: Kobo; receivedOn: string; reference: string }): Promise<void>;
+
   invoices(clientId?: string): Promise<Invoice[]>;
+  getInvoice(id: string): Promise<Invoice | null>;
+  createInvoiceDraft(clientId: string, draft: InvoiceDraft): Promise<Invoice>;
+  sendInvoice(id: string, dueOn: string): Promise<Invoice>;
+  /** Adds a payment; the invoice becomes part-paid or paid. Refuses overpayment. */
+  recordPayment(id: string, payment: InvoicePayment): Promise<Invoice>;
+
+  listStaff(): Promise<StaffMember[]>;
+  inviteStaff(input: Omit<StaffMember, 'id' | 'status'>): Promise<StaffMember>;
+}
+
+/** A business rule refused the change. `code` is shown to the user via lib/notices.ts. */
+export class DataRuleError extends Error {
+  constructor(
+    public readonly code: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'DataRuleError';
+  }
 }

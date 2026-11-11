@@ -134,6 +134,55 @@ select tests.expect('finance sees invoices', (select count(*) from public.invoic
 select tests.expect('finance cannot read diagnoses', (select count(*) from public.consultations), 0);
 reset role;
 
+-- ── Invoice payments ────────────────────────────────────────────────────
+update public.invoices set status = 'sent', due_on = '2026-10-20' where number = 'INV-0142';
+
+select tests.login('d0000000-0000-0000-0000-000000000002');
+insert into public.invoice_payments (invoice_id, amount_kobo, paid_on, reference, recorded_by)
+select id, 100000000, '2026-11-05', 'TRF-1', auth.uid() from public.invoices where number = 'INV-0142';
+select tests.expect('a part payment updates the amount paid',
+  (select paid_kobo from public.invoices where number = 'INV-0142'), 100000000);
+select tests.expect('a part payment marks the invoice part-paid',
+  (select count(*) from public.invoices where number = 'INV-0142' and status = 'part_paid'), 1);
+do $$
+begin
+  insert into public.invoice_payments (invoice_id, amount_kobo, paid_on, recorded_by)
+  select id, 300000000, '2026-11-06', auth.uid() from public.invoices where number = 'INV-0142';
+  raise exception 'FAILED: an overpayment was accepted';
+exception when raise_exception then
+  if sqlerrm like 'FAILED%' then raise; end if;
+  raise notice 'ok: payments cannot exceed the invoice total';
+end $$;
+insert into public.invoice_payments (invoice_id, amount_kobo, paid_on, recorded_by)
+select id, 233250000, '2026-11-07', auth.uid() from public.invoices where number = 'INV-0142';
+select tests.expect('paying the balance marks the invoice paid',
+  (select count(*) from public.invoices where number = 'INV-0142' and status = 'paid' and paid_kobo = total_kobo), 1);
+reset role;
+
+select tests.login('d0000000-0000-0000-0000-000000000001');
+do $$
+begin
+  insert into public.invoice_payments (invoice_id, amount_kobo, paid_on, recorded_by)
+  select id, 100, '2026-11-07', auth.uid() from public.invoices where number = 'INV-0142';
+  raise exception 'FAILED: operations recorded a payment';
+exception when insufficient_privilege then
+  raise notice 'ok: only finance records payments';
+end $$;
+select tests.expect('ops can read payments', (select count(*) from public.invoice_payments), 2);
+reset role;
+
+select tests.login('b0000000-0000-0000-0000-000000000001');
+select tests.expect('client viewers cannot read payments', (select count(*) from public.invoice_payments), 0);
+reset role;
+
+-- ── Staff profiles ──────────────────────────────────────────────────────
+select tests.login('a0000000-0000-0000-0000-000000000001');
+select tests.expect('client admins cannot see our staff list', (select count(*) from public.profiles where client_id is null), 0);
+reset role;
+select tests.login('d0000000-0000-0000-0000-000000000001');
+select tests.expect('ops sees every profile', (select count(*) from public.profiles), 8);
+reset role;
+
 -- ── Signed out ──────────────────────────────────────────────────────────
 do $$
 begin

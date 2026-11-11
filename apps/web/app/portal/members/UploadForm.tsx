@@ -1,19 +1,27 @@
 'use client';
 
 import { useActionState } from 'react';
-import { uploadMembersAction, type UploadState } from './actions';
+import type { UploadState } from './actions';
 
-export function UploadForm() {
-  const [state, action, pending] = useActionState<UploadState, FormData>(uploadMembersAction, { status: 'idle' });
+/** Member-list upload. Used by the client portal and, for a chosen client, the admin console. */
+export function UploadForm({
+  action: serverAction,
+  clientId,
+}: {
+  action: (prev: UploadState, form: FormData) => Promise<UploadState>;
+  clientId?: string;
+}) {
+  const [state, action, pending] = useActionState<UploadState, FormData>(serverAction, { status: 'idle' });
   return (
     <form action={action} className="stack" style={{ gap: 10 }}>
+      {clientId && <input type="hidden" name="clientId" value={clientId} />}
       <div className="dropzone">
         <svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#0068A3" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M12 16V4M7 9l5-5 5 5" />
           <path d="M4 16v4h16v-4" />
         </svg>
         <label htmlFor="member-file" className="strong">
-          Choose your member list (CSV)
+          Choose the member list (CSV)
         </label>
         <input id="member-file" name="file" type="file" accept=".csv,text/csv" required />
       </div>
