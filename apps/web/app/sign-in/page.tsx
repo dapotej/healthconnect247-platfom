@@ -1,5 +1,5 @@
 import { Notice } from '@/components/Notice';
-import { isDemoMode } from '@/lib/data';
+import { isDemoMode, isStaging } from '@/lib/data';
 import { DEMO_USERS } from '@/lib/session';
 import { demoSignInAction, resetPasswordAction, signInAction } from './actions';
 import { ForwardEmailLink } from './ForwardEmailLink';
@@ -19,6 +19,11 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
   return (
     <div className="signin">
       {!demo && <ForwardEmailLink />}
+      {isStaging() && (
+        <div className="demo-flag" style={{ gridColumn: '1 / -1' }}>
+          Staging site for testing: made-up data only. Don’t enter or upload real member or patient details.
+        </div>
+      )}
       <div className="brand-side">
         <img src="/logo-white.png" alt="HealthConnect 24x7. You Call. We Care." style={{ width: 240, height: 'auto' }} />
         <div className="stack" style={{ gap: 16 }}>

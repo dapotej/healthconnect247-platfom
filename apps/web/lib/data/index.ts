@@ -10,6 +10,14 @@ export function isDemoMode(): boolean {
   return process.env.HC247_DEMO_MODE === 'true';
 }
 
+/**
+ * A test copy of the real site (HC247_SITE=staging). Shows a warning on every
+ * page so nobody enters real member or patient data.
+ */
+export function isStaging(): boolean {
+  return process.env.HC247_SITE === 'staging';
+}
+
 /** The current time. Demo mode uses a fixed time so the data matches the mockups. */
 export function now(): string {
   if (isDemoMode()) return process.env.HC247_DEMO_NOW ?? '2026-11-10T22:00:00+01:00';

@@ -40,6 +40,16 @@ Open http://localhost:3000 and pick a demo account: an HMO's head of claims, an 
 
 Set the Supabase variables in `apps/web/.env.local` (see `.env.example`) and leave `HC247_DEMO_MODE` unset.
 
+## Sites
+
+| Site | Address | Data |
+|---|---|---|
+| Demo | healthconnect247-demo.vercel.app | Generated sample data (`HC247_DEMO_MODE=true`) |
+| Staging | healthconnect247.vercel.app | The current Supabase project (HC247, eu-west-1), made-up test data only (`HC247_SITE=staging` shows a warning on every page) |
+| Live | Not set up yet | A new Supabase project on a paid plan with backups, created when going live |
+
+Every push to the branch redeploys the demo and staging sites.
+
 ## Setting up the live site
 
 1. **Supabase → Authentication → Sign In / Providers**: turn off "Allow new users to sign up". Accounts are created by invitation only.

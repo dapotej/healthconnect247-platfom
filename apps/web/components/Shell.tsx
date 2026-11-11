@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { signOutAction } from '@/app/sign-in/actions';
-import { isDemoMode } from '@/lib/data';
+import { isDemoMode, isStaging } from '@/lib/data';
 import type { SessionUser } from '@/lib/session';
 
 export interface NavItem {
@@ -20,6 +20,7 @@ export function Shell(props: {
   return (
     <>
       {isDemoMode() && <div className="demo-flag">Demo: sample data only. Don’t enter or upload real member or patient details.</div>}
+      {isStaging() && <div className="demo-flag">Staging site for testing: made-up data only. Don’t enter or upload real member or patient details.</div>}
       <header className="topbar">
         <div className="brand">
           <img src="/logo-white.png" alt="HealthConnect 24x7" />
