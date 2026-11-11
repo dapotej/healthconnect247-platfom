@@ -19,7 +19,7 @@ export function Shell(props: {
 }) {
   return (
     <>
-      {isDemoMode() && <div className="demo-flag">Demo mode: sample data, not real members or patients</div>}
+      {isDemoMode() && <div className="demo-flag">Demo: sample data only. Don’t enter or upload real member or patient details.</div>}
       <header className="topbar">
         <div className="brand">
           <img src="/logo-white.png" alt="HealthConnect 24x7" />
