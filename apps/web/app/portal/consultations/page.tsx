@@ -83,7 +83,7 @@ export default async function ConsultationsPage({ searchParams }: { searchParams
                 <th>Member</th>
                 <th>Type</th>
                 <th>Clinician</th>
-                <th>Diagnosis (ICD-10)</th>
+                <th>Diagnosis (ICD-11)</th>
                 <th>Outcome</th>
                 <th className="num">Charge</th>
               </tr>
@@ -102,7 +102,7 @@ export default async function ConsultationsPage({ searchParams }: { searchParams
                   {c.type === 'therapy' ? (
                     <td className="restricted">Not shared</td>
                   ) : (
-                    <td>{c.icd10Code ? `${c.icd10Code} · ${c.diagnosisLabel ?? ''}` : '—'}</td>
+                    <td>{c.diagnosisCode ? `${c.diagnosisCode} · ${c.diagnosisLabel ?? ''}` : '—'}</td>
                   )}
                   <td>{c.outcome ? OUTCOME_LABELS[c.outcome] : '—'}</td>
                   <td className="num strong">{formatNaira(c.chargeKobo)}</td>

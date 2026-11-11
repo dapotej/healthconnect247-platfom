@@ -6,6 +6,8 @@ import {
   matchMember,
   normalizeNigerianPhone,
   parseConsultationExport,
+  parseConsultationTable,
+  matchClient,
   parseDate,
   parseLagosDateTime,
   parseNairaInput,
@@ -111,7 +113,7 @@ describe('parseConsultationExport', () => {
     'C-1001,10/11/2026,18:00,HC-100001,,GP Consultation,App,English,Dr I. Nwankwo,B54,Malaria,Prescription',
   ].join('\n');
 
-  const result = parseConsultationExport(csv);
+  const result = parseConsultationExport(csv, { codeSystem: 'icd10' });
 
   it('maps types, channels, languages and outcomes', () => {
     expect(result.consultations.map((c) => [c.externalRef, c.type, c.channel, c.language, c.outcome])).toEqual([
@@ -122,13 +124,14 @@ describe('parseConsultationExport', () => {
     expect(result.consultations[0]).toMatchObject({
       occurredAt: '2026-11-10T21:12:00+01:00',
       phoneE164: '+2348034567812',
-      icd10Code: 'I10',
+      diagnosisCode: 'I10',
+      diagnosisCodeSystem: 'icd10',
     });
   });
 
   it('reports rows it cannot import', () => {
     expect(result.errors).toEqual([
-      { row: 5, name: 'C-1004', problem: 'Consultation type not recognised (Lab results); Diagnosis code not valid (E119)' },
+      { row: 5, name: 'C-1004', problem: 'Consultation type not recognised (Lab results); Diagnosis code not valid ICD-10 (E119)' },
       { row: 6, name: 'C-1001', problem: 'Reference also used on row 2' },
     ]);
   });
@@ -139,11 +142,90 @@ describe('parseConsultationExport', () => {
       byPhone: new Map([['+2348161112240', ['m7']], ['+2348034567812', ['m1', 'm2']]]),
     };
     const [gp, coord, therapy] = result.consultations;
-    expect(matchMember(gp!, index)).toEqual({ memberId: 'm1' });
-    expect(matchMember(coord!, index)).toEqual({ memberId: 'm4' });
-    expect(matchMember(therapy!, index)).toEqual({ memberId: 'm7' });
+    expect(matchMember(gp!, index)).toEqual({ memberId: 'm1', via: 'member_id' });
+    expect(matchMember(coord!, index)).toEqual({ memberId: 'm4', via: 'member_id' });
+    expect(matchMember(therapy!, index)).toEqual({ memberId: 'm7', via: 'phone' });
     expect(matchMember({ ...gp!, memberExternalId: null }, index)).toEqual({
       problem: 'Phone number matches more than one member; member ID needed',
     });
+  });
+});
+
+describe('HealthConnect EMR export', () => {
+  // The EMR's column layout with made-up rows. Clinical-note columns are
+  // included to prove they're ignored.
+  const headers = [
+    'AssignedDoctorName', 'DocumentingDoctorName', 'Encounter_EncounterId', 'Encounter_PatientId',
+    'Encounter_EncounterDate', 'Encounter_ServiceName', 'Encounter_EncounterType', 'Encounter_EncounterSubType',
+    'Encounter_ReasonForEncounter', 'Encounter_CommunicationMethod', 'Encounter_ContactNumber', 'Encounter_Status',
+    'Encounter_ClinicalOutcome', 'DoctorNote_ChiefComplaint', 'DoctorNote_PlanNotes', 'DoctorNote_NoteStatus',
+    'DoctorNote_ICD10Code', 'DoctorNote_ICD10Description', 'Patient_PatientCode', 'Patient_Gender',
+  ];
+  const row = (cells: string[]) => Object.fromEntries(headers.map((h, i) => [h, cells[i] ?? '']));
+  const table = {
+    headers,
+    rows: [
+      row(['Dr. Ada Obi', 'Dr. Ada Obi', '5001', '9001', '2026-11-03 10:54:00', 'HMO One', 'Clinical Encounter', 'Medical Consultation',
+        'Headache', 'Video', '8030000001', 'Closed', 'medications', 'Headache x 2/7', 'Tabs pcm 1g tds x 3/7', 'Finalized',
+        'ba00', 'Essential hypertension', '2611000001', 'Female']),
+      row(['Dr. Ada Obi', 'Dr. Ada Obi', '5002', '9002', '2026-11-03 11:10:00', 'HMO Two', 'Clinical Encounter', 'Medical Consultation',
+        'Fever', 'Phone', '8030000002', 'Closed', '1. Tabs ACT 80/480 bd x 3/7', 'Fever', 'ACT', 'Finalized',
+        'FA01.Z', 'Osteoarthritis of knee, unspecified', '2611000002', 'Male']),
+      row(['Dr. Ada Obi', '', '5003', '9003', '2026-11-04 09:00:00', 'HMO One', 'Clinical Encounter', 'Medical Inquiry',
+        '', 'Phone', '', 'Closed', 'Responded to inquiry', '', '', 'Finalized', '', '', '2611000003', 'Male']),
+      row(['Dr. Ada Obi', '', '5004', '9004', '2026-11-04 09:30:00', 'Student Health Consultation', 'Consultation', '',
+        '', 'Portal', '803000000', 'Closed', 'referral', '', '', 'Finalized', '1F40&XN69B', 'Malaria', '2611000004', 'Female']),
+      row(['Dr. Ada Obi', '', '5005', '9005', '2026-11-04 10:00:00', 'HMO One', 'Clinical Encounter', 'Medical Consultation',
+        '', 'Video', '8030000005', 'Open', '', '', '', 'Draft', '', '', '2611000005', 'Female']),
+      row(['Dr. Ada Obi', 'Dr. Ada Obi', '5006', '9006', '2026-11-04 10:30:00', 'HMO One', 'Clinical Encounter', 'Medical Consultation',
+        '', 'Video', '8030000006', 'Closed', 'treatment', '', '', 'Finalized', 'I10', 'Hypertension', '2611000006', 'Male']),
+    ],
+  };
+  const result = parseConsultationTable(table);
+
+  it('reads the EMR columns and maps ICD-11 diagnoses, channels and outcomes', () => {
+    expect(result.consultations.map((c) => [c.externalRef, c.clientName, c.type, c.channel, c.diagnosisCode, c.outcome])).toEqual([
+      ['5001', 'HMO One', 'gp', 'app_video', 'BA00', 'prescription'],
+      ['5002', 'HMO Two', 'gp', 'phone', 'FA01.Z', 'prescription'],
+      ['5003', 'HMO One', 'coordinator_resolved', 'phone', null, 'advice'],
+      ['5004', 'Student Health Consultation', 'gp', 'web', '1F40&XN69B', 'referral'],
+    ]);
+    expect(result.consultations[0]).toMatchObject({
+      occurredAt: '2026-11-03T10:54:00+01:00',
+      phoneE164: '+2348030000001',
+      patientCode: '2611000001',
+      clinicianName: 'Dr. Ada Obi',
+      diagnosisCodeSystem: 'icd11',
+      diagnosisLabel: 'Essential hypertension',
+    });
+    expect(result.consultations[3]!.phoneE164).toBeNull();
+  });
+
+  it('never carries clinical notes or free-text outcomes', () => {
+    const text = JSON.stringify(result.consultations);
+    for (const note of ['Headache', 'Tabs pcm', 'ACT 80/480', 'Fever', 'Female']) expect(text).not.toContain(note);
+  });
+
+  it('holds back unfinished encounters and reports bad rows', () => {
+    expect(result.pending).toEqual([{ row: 6, name: '5005', problem: "Not finished yet (Open). Import it again once it's closed." }]);
+    expect(result.errors).toEqual([{ row: 7, name: '5006', problem: 'Diagnosis code not valid ICD-11 (I10)' }]);
+  });
+
+  it('matches clients by any of their export names', () => {
+    const clients = [{ id: 'c1', names: ['HMO One', 'HMO-ONE Ltd'] }, { id: 'c2', names: ['HMO Two'] }];
+    expect(matchClient('hmo one', clients)).toEqual({ clientId: 'c1' });
+    expect(matchClient('HMO-ONE LTD', clients)).toEqual({ clientId: 'c1' });
+    expect(matchClient('Test Hmo', clients)).toMatchObject({ problem: expect.stringContaining("isn't set up") });
+  });
+
+  it('matches members by a remembered patient code before the phone number', () => {
+    const [first] = result.consultations;
+    const index = {
+      byPatientCode: new Map([['2611000001', 'm9']]),
+      byExternalId: new Map<string, string>(),
+      byPhone: new Map([['+2348030000001', ['m1']]]),
+    };
+    expect(matchMember(first!, index)).toEqual({ memberId: 'm9', via: 'patient_code' });
+    expect(matchMember(first!, { ...index, byPatientCode: new Map() })).toEqual({ memberId: 'm1', via: 'phone' });
   });
 });

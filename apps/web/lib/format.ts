@@ -52,6 +52,8 @@ export const CHANNEL_LABELS: Record<Channel, string> = {
   app_voice: 'App · voice',
   app_video: 'App · video',
   toll_free: 'Toll-free line',
+  phone: 'Phone call',
+  web: 'Web portal',
   callback: 'Callback',
 };
 

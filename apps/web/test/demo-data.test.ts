@@ -24,8 +24,8 @@ describe('privacy rules in the demo data source', () => {
     const rows = await data.clientConsultations('hmo-a', '2026-10-01', '2026-11-10');
     const therapy = rows.filter((c) => c.type === 'therapy');
     expect(therapy.length).toBeGreaterThan(0);
-    expect(therapy.every((c) => c.icd10Code === null && c.diagnosisLabel === null)).toBe(true);
-    expect(rows.some((c) => c.type === 'gp' && c.icd10Code)).toBe(true);
+    expect(therapy.every((c) => c.diagnosisCode === null && c.diagnosisLabel === null)).toBe(true);
+    expect(rows.some((c) => c.type === 'gp' && c.diagnosisCode)).toBe(true);
   });
 
   it('only returns the requested client’s consultations', async () => {
@@ -36,7 +36,7 @@ describe('privacy rules in the demo data source', () => {
   it('gives staff billing rows without diagnoses or clinician details', async () => {
     const [row] = await data.billingConsultations('2026-11-10', '2026-11-10');
     expect(row).toBeDefined();
-    expect(Object.keys(row!)).not.toEqual(expect.arrayContaining(['icd10Code']));
+    expect(Object.keys(row!)).not.toEqual(expect.arrayContaining(['diagnosisCode']));
     expect('diagnosisLabel' in row! || 'clinicianName' in row!).toBe(false);
   });
 });
@@ -47,7 +47,7 @@ describe('claims CSV export', () => {
     const therapy = (await data.clientConsultations('hmo-a', '2026-11-01', '2026-11-10')).find((c) => c.type === 'therapy')!;
     const csv = consultationsCsv([...rows, therapy, { ...therapy, id: 'x', externalRef: 'X-1', memberName: '=HYPERLINK("http://evil")' }]);
     const lines = csv.trim().split('\r\n');
-    expect(lines[0]).toContain('ICD-10');
+    expect(lines[0]).toContain('ICD-11 code');
     expect(lines).toHaveLength(53);
     const therapyLine = lines[51]!;
     expect(therapyLine).toContain('Therapy session');

@@ -59,14 +59,14 @@ insert into public.members (id, client_id, external_member_id, full_name, phone_
   ('e0000000-0000-0000-0000-0000000000b1', '00000000-0000-0000-0000-0000000000b1', 'HB-200001', 'Emeka Obi', '+2348050003341');
 
 insert into public.consultations
-  (client_id, member_id, contract_id, source, external_ref, occurred_at, type, icd10_code, diagnosis_label, charge_kobo, billing)
+  (client_id, member_id, contract_id, source, external_ref, occurred_at, type, diagnosis_code, diagnosis_label, charge_kobo, billing)
 values
   ('00000000-0000-0000-0000-0000000000a1', 'e0000000-0000-0000-0000-0000000000a1', '10000000-0000-0000-0000-0000000000a1',
-   'call_centre_import', 'C-1', '2026-11-10 21:12+01', 'gp', 'I10', 'Hypertension', 380000, 'credit'),
+   'call_centre_import', 'C-1', '2026-11-10 21:12+01', 'gp', 'BA00', 'Essential hypertension', 380000, 'credit'),
   ('00000000-0000-0000-0000-0000000000a1', 'e0000000-0000-0000-0000-0000000000a1', '10000000-0000-0000-0000-0000000000a1',
-   'call_centre_import', 'C-2', '2026-11-10 19:48+01', 'therapy', 'F41.1', 'Anxiety', 1000000, 'credit'),
+   'call_centre_import', 'C-2', '2026-11-10 19:48+01', 'therapy', '6B00', 'Generalised anxiety disorder', 1000000, 'credit'),
   ('00000000-0000-0000-0000-0000000000b1', 'e0000000-0000-0000-0000-0000000000b1', '10000000-0000-0000-0000-0000000000b1',
-   'call_centre_import', 'C-3', '2026-11-10 18:05+01', 'gp', 'B54', 'Malaria', 450000, 'invoice');
+   'call_centre_import', 'C-3', '2026-11-10 18:05+01', 'gp', '1F4Z', 'Malaria, unspecified', 450000, 'invoice');
 
 insert into public.credit_ledger (client_id, occurred_at, kind, amount_kobo, reference) values
   ('00000000-0000-0000-0000-0000000000a1', '2026-11-01 09:00+01', 'topup', 500000000, 'TOP-0033');
@@ -84,6 +84,26 @@ exception when exclusion_violation then
   raise notice 'ok: a client cannot have two contracts in force on the same day';
 end $$;
 
+do $$
+begin
+  insert into public.consultations (client_id, member_id, contract_id, source, external_ref, occurred_at, type, diagnosis_code, charge_kobo, billing)
+  values ('00000000-0000-0000-0000-0000000000a1', 'e0000000-0000-0000-0000-0000000000a1', '10000000-0000-0000-0000-0000000000a1',
+          'emr_import', 'E-9', '2026-11-10 10:00+01', 'gp', 'I10', 0, 'credit');
+  raise exception 'FAILED: an ICD-10 code was accepted as ICD-11';
+exception when check_violation then
+  raise notice 'ok: diagnosis codes must match their coding system';
+end $$;
+
+insert into public.consultations
+  (client_id, member_id, contract_id, source, external_ref, occurred_at, type, diagnosis_code, diagnosis_code_system, charge_kobo, billing)
+values
+  ('00000000-0000-0000-0000-0000000000b1', 'e0000000-0000-0000-0000-0000000000b1', '10000000-0000-0000-0000-0000000000b1',
+   'emr_import', '5001', '2026-11-03 10:54+01', 'gp', 'FA01.Z', 'icd11', 380000, 'invoice'),
+  ('00000000-0000-0000-0000-0000000000b1', 'e0000000-0000-0000-0000-0000000000b1', '10000000-0000-0000-0000-0000000000b1',
+   'emr_import', '5002', '2026-11-03 11:10+01', 'gp', '1F40&XN69B', 'icd11', 380000, 'invoice');
+select tests.expect('ICD-11 codes from the EMR are accepted', (select count(*) from public.consultations where source = 'emr_import'), 2);
+delete from public.consultations where source = 'emr_import';
+
 -- ── [HMO A] client admin ────────────────────────────────────────────────
 select tests.login('a0000000-0000-0000-0000-000000000001');
 select tests.expect('client sees only its own organisation', (select count(*) from public.clients), 1);
@@ -91,9 +111,9 @@ select tests.expect('client sees only its own members', (select count(*) from pu
 select tests.expect('client cannot read the consultations table directly', (select count(*) from public.consultations), 0);
 select tests.expect('client sees its own consultations in the portal view', (select count(*) from public.client_consultations), 2);
 select tests.expect('client never sees therapy diagnoses',
-  (select count(*) from public.client_consultations where type = 'therapy' and (icd10_code is not null or diagnosis_label is not null)), 0);
+  (select count(*) from public.client_consultations where type = 'therapy' and (diagnosis_code is not null or diagnosis_label is not null)), 0);
 select tests.expect('client sees GP diagnosis codes for claims',
-  (select count(*) from public.client_consultations where type = 'gp' and icd10_code = 'I10'), 1);
+  (select count(*) from public.client_consultations where type = 'gp' and diagnosis_code = 'BA00'), 1);
 select tests.expect('client sees its credit balance', (select balance_kobo from public.client_credit_balances), 500000000);
 select tests.expect('client cannot see billing view', (select count(*) from public.billing_consultations), 0);
 do $$

@@ -57,7 +57,8 @@ export interface ClientConsultation {
   memberName: string;
   clinicianName: string | null;
   clinicianLicence: string | null;
-  icd10Code: string | null;
+  /** ICD-11, as recorded in the EMR. Never set for therapy in the client portal. */
+  diagnosisCode: string | null;
   diagnosisLabel: string | null;
   outcome: ConsultationOutcome | null;
   chargeKobo: Kobo;

@@ -13,7 +13,11 @@ export type ConsultationType = (typeof CONSULTATION_TYPES)[number];
 export const PRICING_MODELS = ['payg', 'flex', 'unlimited'] as const;
 export type PricingModel = (typeof PRICING_MODELS)[number];
 
-export const CHANNELS = ['app_voice', 'app_video', 'toll_free', 'callback'] as const;
+/**
+ * How the member reached us. `phone` is a voice call where the source system
+ * can't tell the toll-free line from an in-app call; `web` is a web portal.
+ */
+export const CHANNELS = ['app_voice', 'app_video', 'toll_free', 'phone', 'web', 'callback'] as const;
 export type Channel = (typeof CHANNELS)[number];
 
 export const LANGUAGES = ['english', 'yoruba', 'igbo', 'hausa', 'other'] as const;
@@ -29,6 +33,10 @@ export const OUTCOMES = [
   'other',
 ] as const;
 export type ConsultationOutcome = (typeof OUTCOMES)[number];
+
+/** Diagnosis coding systems. HealthConnect's EMR records ICD-11. */
+export const DIAGNOSIS_CODE_SYSTEMS = ['icd11', 'icd10'] as const;
+export type DiagnosisCodeSystem = (typeof DIAGNOSIS_CODE_SYSTEMS)[number];
 
 /** How a priced consultation is paid for. */
 export type BillingMethod =

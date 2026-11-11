@@ -89,13 +89,27 @@ const CLINICIANS = [
 ];
 const COORDINATORS = ['C. Nwosu', 'I. Sule', 'B. Ogunleye', 'Z. Abubakar'];
 const THERAPISTS = ['A. Kalu', 'M. Danjuma'];
-const DIAGNOSES = [
-  ['B54', 'Malaria'], ['J06.9', 'Upper respiratory infection'], ['I10', 'Hypertension'],
-  ['E11.9', 'Type 2 diabetes'], ['K30', 'Indigestion'], ['A09', 'Gastroenteritis'],
-  ['L30.9', 'Dermatitis'], ['N39.0', 'Urinary tract infection'], ['R51', 'Headache'],
-  ['M54.5', 'Low back pain'], ['R10.4', 'Abdominal pain'], ['N94.6', 'Painful periods'],
+// ICD-11, as the EMR records them, weighted roughly like a real week of GP calls.
+const DIAGNOSES: ReadonlyArray<readonly [readonly [string, string], number]> = [
+  [['1F40', 'Malaria due to Plasmodium falciparum'], 31],
+  [['1F4Z', 'Malaria, unspecified'], 24],
+  [['CA0Z', 'Upper respiratory tract disorders, unspecified'], 13],
+  [['CA07.0', 'Acute upper respiratory infection, site unspecified'], 12],
+  [['MD12', 'Cough'], 6],
+  [['EA60.Z', 'Fungal infection of the skin, unspecified'], 4],
+  [['BA00', 'Essential hypertension'], 4],
+  [['FA01.Z', 'Osteoarthritis of knee, unspecified'], 3],
+  [['DA61', 'Peptic ulcer, site unspecified'], 3],
+  [['9A60', 'Conjunctivitis'], 3],
+  [['GC08', 'Urinary tract infection, site not specified'], 2],
+  [['1A40', 'Gastroenteritis or colitis without specification of infectious agent'], 3],
+  [['MD92', 'Dyspepsia'], 2],
 ] as const;
-const THERAPY_DIAGNOSES = [['F41.1', 'Anxiety'], ['F32.9', 'Depression'], ['Z63.0', 'Relationship problems']] as const;
+const THERAPY_DIAGNOSES = [
+  ['6B00', 'Generalised anxiety disorder'],
+  ['6A70', 'Single episode depressive disorder'],
+  ['6B43', 'Adjustment disorder'],
+] as const;
 
 // ── Clients and contracts ────────────────────────────────────────────────
 interface ClientSpec {
@@ -221,10 +235,10 @@ function build(): DemoStore {
   const makeConsultation = (spec: ClientSpec, type: ConsultationType, day: string, activeMembers: Member[]): StoredConsultation => {
     const member = pick(rng, activeMembers);
     const priced = priceConsultation(spec.contract, type);
-    const channel: Channel = weighted(rng, [['app_voice', 52], ['toll_free', 42], ['app_video', 6]] as const);
+    const channel: Channel = weighted(rng, [['phone', 64], ['app_video', 28], ['app_voice', 8]] as const);
     const language: CallLanguage = weighted(rng, [['english', 61], ['yoruba', 18], ['hausa', 12], ['igbo', 9]] as const);
     let clinician: { name: string; licence: string | null } = pick(rng, CLINICIANS);
-    let dx: readonly [string, string] | null = pick(rng, DIAGNOSES);
+    let dx: readonly [string, string] | null = weighted(rng, DIAGNOSES);
     let outcome: ConsultationOutcome;
     if (type === 'coordinator_resolved') {
       clinician = { name: pick(rng, COORDINATORS), licence: null };
@@ -250,7 +264,7 @@ function build(): DemoStore {
       memberName: member.fullName,
       clinicianName: clinician.name,
       clinicianLicence: clinician.licence,
-      icd10Code: dx?.[0] ?? null,
+      diagnosisCode: dx?.[0] ?? null,
       diagnosisLabel: dx?.[1] ?? null,
       outcome,
       chargeKobo: priced.chargeKobo,
@@ -503,7 +517,7 @@ export const demoDataSource: DataSource = {
     return store()
       .consultations.filter((c) => c.clientId === clientId && inRange(c.occurredAt, from, to))
       .map(({ clientId: _omit, ...c }) =>
-        c.type === 'therapy' ? { ...c, icd10Code: null, diagnosisLabel: null } : c,
+        c.type === 'therapy' ? { ...c, diagnosisCode: null, diagnosisLabel: null } : c,
       );
   },
   async billingConsultations(from, to, clientId) {

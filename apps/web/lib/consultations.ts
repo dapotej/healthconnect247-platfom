@@ -52,7 +52,7 @@ const lagosParts = new Intl.DateTimeFormat('en-GB', {
 export function consultationsCsv(rows: ClientConsultation[]): string {
   const header = [
     'Visit ID', 'Date', 'Time (Lagos)', 'Member ID', 'Member name', 'Type', 'Channel', 'Language',
-    'Clinician', 'Clinician licence', 'ICD-10', 'Diagnosis', 'Outcome', 'Charge (NGN)',
+    'Clinician', 'Clinician licence', 'ICD-11 code', 'Diagnosis', 'Outcome', 'Charge (NGN)',
   ];
   const lines = rows.map((c) => {
     const parts = Object.fromEntries(lagosParts.formatToParts(new Date(c.occurredAt)).map((p) => [p.type, p.value]));
@@ -67,7 +67,7 @@ export function consultationsCsv(rows: ClientConsultation[]): string {
       c.language ? LANGUAGE_LABELS[c.language] : null,
       c.clinicianName,
       c.clinicianLicence,
-      c.icd10Code,
+      c.diagnosisCode,
       c.diagnosisLabel,
       c.outcome ? OUTCOME_LABELS[c.outcome] : null,
       (c.chargeKobo / 100).toFixed(2),

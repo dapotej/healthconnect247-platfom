@@ -39,7 +39,8 @@ Run all three before committing changes to `packages/core` or `supabase/`.
   - Client (HMO) users read consultations only via `public.client_consultations`. Therapy diagnoses are never shown to them.
   - Operations and finance read consultations only via `public.billing_consultations` (no diagnoses).
   - GPs and coordinators never see therapy consultations.
-  - Clinical notes are never exposed to the client portal.
+  - Clinical notes are never exposed to the client portal, and the EMR import never stores them (only the columns listed in `docs/call-centre-import.md`).
+  - Diagnoses are ICD-11 (`diagnosis_code`, with `diagnosis_code_system`), as the EMR records them.
   - Every new table gets row-level security and a check in `supabase/tests/access_rules.sql`.
 - Never commit real member or patient data, exports or `.env` files.
 - Pricing models: `payg` (platform fee + per-consultation invoice), `flex` (prepaid credit, deducted per consultation), `unlimited` (per member per month; therapy only with the add-on). Rates live in `contract_rates`; don't hard-code prices.
