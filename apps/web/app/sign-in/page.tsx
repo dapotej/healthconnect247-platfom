@@ -2,15 +2,23 @@ import { Notice } from '@/components/Notice';
 import { isDemoMode } from '@/lib/data';
 import { DEMO_USERS } from '@/lib/session';
 import { demoSignInAction, resetPasswordAction, signInAction } from './actions';
+import { ForwardEmailLink } from './ForwardEmailLink';
+import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 
 export default async function SignInPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;
   const demo = isDemoMode();
+  // A password-reset or invitation link that came back with a one-time code.
+  const code = typeof params.code === 'string' ? params.code : null;
+  if (!demo && code && /^[\w-]{10,200}$/.test(code)) {
+    redirect(`/auth/callback?next=/account/password&code=${encodeURIComponent(code)}`);
+  }
   const resetting = params.reset === '1';
   return (
     <div className="signin">
+      {!demo && <ForwardEmailLink />}
       <div className="brand-side">
         <img src="/logo-white.png" alt="HealthConnect 24x7. You Call. We Care." style={{ width: 240, height: 'auto' }} />
         <div className="stack" style={{ gap: 16 }}>
