@@ -152,6 +152,7 @@ set role anon;
 select tests.expect_denied('signed-out visitor cannot read the client view', 'select 1 from public.client_consultations');
 select tests.expect_denied('signed-out visitor cannot read the billing view', 'select 1 from public.billing_consultations');
 select tests.expect_denied('signed-out visitor cannot read credit balances', 'select 1 from public.client_credit_balances');
+select tests.expect_denied('signed-out visitor cannot call the role helper', 'select public.has_role(''ops_admin'')');
 reset role;
 
 select tests.login('d0000000-0000-0000-0000-000000000002');
