@@ -15,3 +15,4 @@ supabase/.temp/
 *.csv
 *.xlsx
 !packages/core/test/fixtures/*.csv
+*.tsbuildinfo

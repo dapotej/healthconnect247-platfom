@@ -10,7 +10,9 @@ Telemedicine for Nigerian HMOs, employers and state health schemes: a client por
 | Member-list upload validation | Done, tested |
 | Call-centre export import | Parser done with guessed column names; waiting for a real export sample |
 | Database schema and access rules (`supabase/`) | Done, tested locally |
-| Client portal and admin console (`apps/web`) | Next |
+| Client portal (`apps/web/app/portal`): dashboard, members and upload, consultations and claims export, billing and credit | Done, running on demo data |
+| Admin console (`apps/web/app/admin`): overview, clients, client details | First screens done, running on demo data |
+| Supabase data source and real sign-in | Next, once the Supabase project exists |
 | Clinician console | Later |
 | Member app (`apps/mobile`) | Later |
 
@@ -24,6 +26,15 @@ pnpm test        # unit tests
 pnpm typecheck
 pnpm test:db     # migrations + access-rule checks on a throwaway Postgres
 ```
+
+### Run the web app in demo mode
+
+```bash
+cp apps/web/.env.example apps/web/.env.local
+pnpm --filter @hc247/web dev
+```
+
+Open http://localhost:3000 and pick a demo account: an HMO's head of claims, an HMO claims manager, a Lagos State viewer, the operations manager or finance. Demo mode uses generated sample data (no real people) with "today" fixed at 10 November 2026, so the numbers match the mockups. Member uploads are kept in memory until the server restarts.
 
 ## Before going live
 

@@ -15,7 +15,11 @@ Build order: backend and call-centre import → client portal + admin minimum �
 - `packages/core` – pure TypeScript business rules (pricing, credit, invoicing, imports). No I/O. Fully unit-tested.
 - `supabase/migrations` – database schema and row-level security. `supabase/seed.sql` is sample data only.
 - `supabase/tests` – local stand-ins for Supabase auth plus access-rule checks.
-- `apps/web` (next) – Next.js app hosting the portal, admin and clinician console.
+- `apps/web` – Next.js 15 app: `/portal` (HMO users), `/admin` (our staff), `/sign-in`.
+  - Pages read and write only through the `DataSource` interface (`lib/data/types.ts`). `lib/data/demo.ts` is the demo implementation; the Supabase implementation must read consultations through `client_consultations` / `billing_consultations`, never the base table, so the database rules apply.
+  - Every reporting page uses `resolvePeriod` + `<PeriodPicker>` and states the period ("Showing 1–10 Nov 2026"). Figures that are "as of today" (balances, amounts owed) say so.
+  - Server components by default; client components only for interactivity (e.g. the upload form). Pages must work at phone width.
+  - `HC247_DEMO_MODE=true` enables demo data and the demo sign-in. It must never be set in production.
 - `apps/mobile` (later) – Expo member app.
 
 ## Commands
