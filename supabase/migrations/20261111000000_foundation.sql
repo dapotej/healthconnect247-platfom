@@ -12,8 +12,10 @@
 --       - GPs and coordinators cannot read therapy consultations; therapists
 --         read only therapy; the clinical lead reads all.
 
-create extension if not exists pgcrypto;
-create extension if not exists btree_gist;
+-- Extensions live in their own schema, as Supabase recommends.
+create schema if not exists extensions;
+create extension if not exists pgcrypto with schema extensions;
+create extension if not exists btree_gist with schema extensions;
 
 -- ── Types ───────────────────────────────────────────────────────────────
 create type public.client_type as enum ('hmo', 'government', 'employer');
